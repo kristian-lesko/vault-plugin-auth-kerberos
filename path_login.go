@@ -127,24 +127,29 @@ func (b *backend) pathLogin(req *logical.Request, d *framework.FieldData) (*logi
 		return nil, fmt.Errorf("LDAP bind failed: %v", err)
 	}
 
-	userBindDN, err := b.getUserBindDN(ldapConfig, ldapConnection, creds.Username)
-	if err != nil {
-		return nil, err
+	if ldapConfig.ServiceDN != "" {
+		ldapGroups, err := b.getHostLdapGroups(ldapConfig, ldapConnection, creds.Username)
+	} else {
+		userBindDN, err := b.getUserBindDN(ldapConfig, ldapConnection, creds.Username)
+		if err != nil {
+			return nil, err
+		}
+
+		if b.Logger().IsDebug() {
+			b.Logger().Debug("auth/ldap: User BindDN fetched", "username", creds.Username, "binddn", userBindDN)
+		}
+
+		userDN, err := b.getUserDN(ldapConfig, ldapConnection, userBindDN)
+		if err != nil {
+			return nil, err
+		}
+
+		ldapGroups, err := b.getLdapGroups(ldapConfig, ldapConnection, userDN, creds.Username)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if b.Logger().IsDebug() {
-		b.Logger().Debug("auth/ldap: User BindDN fetched", "username", creds.Username, "binddn", userBindDN)
-	}
-
-	userDN, err := b.getUserDN(ldapConfig, ldapConnection, userBindDN)
-	if err != nil {
-		return nil, err
-	}
-
-	ldapGroups, err := b.getLdapGroups(ldapConfig, ldapConnection, userDN, creds.Username)
-	if err != nil {
-		return nil, err
-	}
 	if b.Logger().IsDebug() {
 		b.Logger().Debug("auth/ldap: Groups fetched from server", "num_server_groups", len(ldapGroups), "server_groups", ldapGroups)
 	}

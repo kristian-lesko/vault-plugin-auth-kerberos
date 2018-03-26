@@ -49,6 +49,11 @@ func pathConfigLdap(b *backend) *framework.Path {
 				Description: "LDAP search base to use for group membership search (eg: ou=Groups,dc=example,dc=org)",
 			},
 
+			"servicedn": &framework.FieldSchema{
+				Type:        framework.TypeString,
+				Description: "LDAP search base to use for service principals search (eg: ou=Services,dc=example,dc=org)",
+			},
+
 			"groupfilter": &framework.FieldSchema{
 				Type:    framework.TypeString,
 				Default: "(|(memberUid={{.Username}})(member={{.UserDN}})(uniqueMember={{.UserDN}}))",
@@ -204,6 +209,10 @@ func (b *backend) newConfigEntry(d *framework.FieldData) (*ConfigEntry, error) {
 	if groupdn != "" {
 		cfg.GroupDN = groupdn
 	}
+	servicedn := d.Get("servicedn").(string)
+	if servicedn != "" {
+		cfg.ServiceDN = servicedn
+	}
 	groupfilter := d.Get("groupfilter").(string)
 	if groupfilter != "" {
 		// Validate the template before proceeding
@@ -310,6 +319,7 @@ type ConfigEntry struct {
 	Url           string `json:"url" structs:"url" mapstructure:"url"`
 	UserDN        string `json:"userdn" structs:"userdn" mapstructure:"userdn"`
 	GroupDN       string `json:"groupdn" structs:"groupdn" mapstructure:"groupdn"`
+	ServiceDN     string `json:"servicedn" structs:"servicedn" mapstructure:"servicedn"`
 	GroupFilter   string `json:"groupfilter" structs:"groupfilter" mapstructure:"groupfilter"`
 	GroupAttr     string `json:"groupattr" structs:"groupattr" mapstructure:"groupattr"`
 	UPNDomain     string `json:"upndomain" structs:"upndomain" mapstructure:"upndomain"`

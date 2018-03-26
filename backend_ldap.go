@@ -250,3 +250,87 @@ func (b *backend) getLdapGroups(cfg *ConfigEntry, c *ldap.Conn, userDN string, u
 
 	return ldapGroups, nil
 }
+
+func (b *backend) getHostLdapGroups(cfg *ConfigEntry, c *ldap.Conn, principal string) ([]string, error) {
+	// retrieve the groups in a string/bool map as a structure to avoid duplicates inside
+	ldapMap := make(map[string]bool)
+
+	if cfg.GroupFilter == "" {
+		b.Logger().Warn("auth/ldap: GroupFilter is empty, will not query server")
+		return make([]string, 0), nil
+	}
+
+	if cfg.GroupDN == "" {
+		b.Logger().Warn("auth/ldap: GroupDN is empty, will not query server")
+		return make([]string, 0), nil
+	}
+
+	result, err := c.Search(&ldap.SearchRequest{
+		BaseDN: cfg.ServiceDN,
+		Scope:  2, // subtree
+		Filter: fmt.Sprintf("(krbprincipalname=%v*)", username),
+		Attributes: []string{
+			"managedBy",
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("LDAP search failed: %v", err)
+	}
+	managedByHosts := make([]string, 0)
+	for _, e := range result.Entries {
+		dn, err := ldap.ParseDN(e.DN)
+		if err != nil || len(dn.RDNs) == 0 {
+			continue
+		}
+
+		values := e.GetAttributeValues("managedBy")
+		if len(values) > 0 {
+			for _, val := range values {
+				managedByHosts = append(managedByHosts, val)
+			}
+		}
+	}
+	if b.Logger().IsDebug() {
+		b.Logger().Debug("Principal", principal, "managed by hosts", managedByHosts)
+	}
+
+	for dn := range managedByHosts {
+		result, err := c.Search(&ldap.SearchRequest{
+			BaseDN: dn,
+			Scope:  2, // subtree
+			Filter: "(memberOf=*)",
+			Attributes: []string{
+				cfg.GroupAttr,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("LDAP search failed: %v", err)
+		}
+
+		for _, e := range result.Entries {
+			dn, err := ldap.ParseDN(e.DN)
+			if err != nil || len(dn.RDNs) == 0 {
+				continue
+			}
+
+			// Add nested groups to the output
+			values := e.GetAttributeValues(cfg.GroupAttr)
+			if len(values) > 0 {
+				for _, val := range values {
+					groupCN := b.getCN(val)
+					ldapMap[groupCN] = true
+				}
+			}
+			// Also add the group itself to the output
+			groupCN := b.getCN(e.DN)
+			ldapMap[groupCN] = true
+		}
+	}
+
+	ldapGroups := make([]string, 0, len(ldapMap))
+	for key, _ := range ldapMap {
+		ldapGroups = append(ldapGroups, key)
+	}
+
+	return ldapGroups, nil
+}
