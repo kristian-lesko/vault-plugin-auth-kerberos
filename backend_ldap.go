@@ -3,6 +3,7 @@ package kerberos
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"text/template"
 
 	"github.com/go-ldap/ldap"
@@ -177,6 +178,10 @@ func (b *backend) getLdapGroups(cfg *ConfigEntry, c *ldap.Conn, userDN string, u
 		b.Logger().Warn("auth/ldap: GroupDN is empty, will not query server")
 		return make([]string, 0), nil
 	}
+
+	// Resolve service into the underlying host (in case of host principal auth)
+	username = strings.TrimPrefix(username, "host/")
+	username = strings.TrimPrefix(username, "HTTP/")
 
 	// If groupfilter was defined, resolve it as a Go template and use the query for
 	// returning the user's groups
