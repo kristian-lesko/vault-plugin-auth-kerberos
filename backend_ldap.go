@@ -225,18 +225,17 @@ func (b *backend) getLdapGroups(cfg *ConfigEntry, c *ldap.Conn, userDN string, u
 			continue
 		}
 
-		// Enumerate attributes of each result, parse out CN and add as group
+		// Add nested groups to the output
 		values := e.GetAttributeValues(cfg.GroupAttr)
 		if len(values) > 0 {
 			for _, val := range values {
 				groupCN := b.getCN(val)
 				ldapMap[groupCN] = true
 			}
-		} else {
-			// If groupattr didn't resolve, use self (enumerating group objects)
-			groupCN := b.getCN(e.DN)
-			ldapMap[groupCN] = true
 		}
+		// Also add the group itself to the output
+		groupCN := b.getCN(e.DN)
+		ldapMap[groupCN] = true
 	}
 
 	ldapGroups := make([]string, 0, len(ldapMap))

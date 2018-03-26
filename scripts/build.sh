@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-TOOL=vault-plugin-auth-kubernetes
+TOOL=vault-plugin-auth-kerberos
 #
 # This script builds the application from source for multiple platforms.
 set -e
@@ -16,14 +16,10 @@ cd "$DIR"
 # Set build tags
 BUILD_TAGS="${BUILD_TAGS}:-${TOOL}"
 
-# Get the git commit
-GIT_COMMIT="$(git rev-parse HEAD)"
-GIT_DIRTY="$(test -n "`git status --porcelain`" && echo "+CHANGES" || true)"
-
 # Determine the arch/os combos we're building for
-XC_ARCH=${XC_ARCH:-"386 amd64"}
-XC_OS=${XC_OS:-linux darwin windows freebsd openbsd netbsd solaris}
-XC_OSARCH=${XC_OSARCH:-"linux/amd64 linux/arm64 darwin/amd64 windows/amd64 freebsd/amd64 openbsd/amd64 netbsd/amd64 solaris/amd64"}
+XC_ARCH=${XC_ARCH:-"amd64"}
+XC_OS=${XC_OS:-linux}
+XC_OSARCH=${XC_OSARCH:-"linux/amd64"}
 
 GOPATH=${GOPATH:-$(go env GOPATH)}
 case $(uname) in
@@ -40,16 +36,16 @@ mkdir -p bin/
 
 # If its dev mode, only build for our self
 if [ "${VAULT_DEV_BUILD}x" != "x" ]; then
-    XC_OS=$(go env GOOS)
-    XC_ARCH=$(go env GOARCH)
-    XC_OSARCH=$(go env GOOS)/$(go env GOARCH)
+    XC_OS="linux"
+    XC_ARCH="amd64"
+    XC_OSARCH="linux/amd64"
 fi
 
 # Build!
 echo "==> Building..."
 gox \
     -osarch="${XC_OSARCH}" \
-    -ldflags "-X github.com/hashicorp/${TOOL}/version.GitCommit='${GIT_COMMIT}${GIT_DIRTY}'" \
+    -ldflags "-X github.com/hashicorp/${TOOL}/version.GitCommit='e0d8d6ea67d8515dcbe6c81fe44268eb3fe00b10'" \
     -output "pkg/{{.OS}}_{{.Arch}}/${TOOL}" \
     -tags="${BUILD_TAGS}" \
     ./cmd/$TOOL
@@ -60,7 +56,7 @@ IFS=: MAIN_GOPATH=($GOPATH)
 IFS=$OLDIFS
 
 # Copy our OS/Arch to the bin/ directory
-DEV_PLATFORM="./pkg/$(go env GOOS)_$(go env GOARCH)"
+DEV_PLATFORM="./pkg/linux_amd64"
 for F in $(find ${DEV_PLATFORM} -mindepth 1 -maxdepth 1 -type f); do
     cp ${F} bin/
     cp ${F} ${MAIN_GOPATH}/bin/
